@@ -1,0 +1,15 @@
+import math
+
+# für daten die in minuten ticks gegeben ist
+# minutes gibt an, welchen prozess man haben will, bsp.: minutes = 5 -> RV 5 Min
+
+def real_vol(prices,minutes):
+    interval = prices[::minutes]
+    log_prices = []
+    for i in range(len(interval)-1):
+        log_prices.append(abs(math.log2(interval[(i+1)])-math.log2(interval[i]))**2)
+    rv = []
+    step = round(1440/minutes)
+    for i in range(round(len(log_prices)/step)-1):
+        rv.append(sum(log_prices[step*i:step*(i+1)]))
+    return rv
