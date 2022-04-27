@@ -1,0 +1,58 @@
+# import btc tick data from cryptodatadownload.com (free sign in needed)
+import pandas as pds
+btc2017 = pds.read_csv('Bitstamp_BTCUSD_2017_minute.csv', skiprows = 1)
+btc2018 = pds.read_csv('Bitstamp_BTCUSD_2018_minute.csv', skiprows = 1)
+btc2019 = pds.read_csv('Bitstamp_BTCUSD_2019_minute.csv', skiprows = 1)
+btc2020 = pds.read_csv('Bitstamp_BTCUSD_2020_minute.csv', skiprows = 1)
+btc2021 = pds.read_csv('Bitstamp_BTCUSD_2021_minute.csv', skiprows = 1)
+btc2022 = pds.read_csv('Bitstamp_BTCUSD_2022_minute.csv', skiprows = 1)
+btc = pds.concat([btc2017,btc2018,btc2019,btc2020,btc2021,btc2022])
+btc = btc[["date","close"]]
+btc['date'] = pds.to_datetime(btc['date'], format='%Y/%m/%d %H:%M:%S')
+btc = btc.sort_values(by='date')
+btc.head()
+
+# prozess für realisierte varianz aus tick data
+# daten in minuten takt gegeben, minutes = 1 nimmt alle daten (RV 1 Min), minutes = 5 nimmt nur jeden 5. tick (RV 5 Min)
+import math
+prices = btc['close'].to_numpy()
+def real_vol(prices,minutes):
+    interval = prices[::minutes]
+    log_prices = []
+    for i in range(len(interval)-1):
+        log_prices.append(abs(math.log2(interval[(i+1)])-math.log2(interval[i]))**2)
+    rv = []
+    step = round(1440/minutes)
+    for i in range(round(len(log_prices)/step)-1):
+        rv.append(sum(log_prices[step*i:step*(i+1)]))
+    return rv
+
+# plot der realisierten varianz
+import matplotlib.pyplot as plt
+rv = real_vol(prices,1)
+plt.plot(rv)
+
+# besov schätzer für hurst parameter
+# zweifache lineare regression
+import numpy as np
+q = np.array([0.1,0.25,0.5,0.75,1,1.5,2,2.5,3])
+delta = 50
+def hurst(rv,q,delta):
+    def m(rv,q,delta):
+        mq = []
+        for i in range(1,delta):
+            sq = []
+            for k in range(2,int(np.floor(len(rv)/i))):
+                sq.append(abs(np.log(rv[k*i]/rv[(k-1)*i]))**q)
+            mq.append(np.mean(sq))
+        y = np.polyfit(np.log(np.array(range(1,delta))),np.log(mq),deg=1)
+        return y[0]
+    hq = []
+    for p in q:
+        hq.append(m(rv,p,delta))
+    y = np.polyfit(q,hq,deg=1)
+    return y[0]
+
+# berechnung der realisierten variance und schätzung des hurst-parameters
+rv = real_vol(prices,1)
+hurst(rv,q,delta)
